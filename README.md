@@ -43,10 +43,6 @@ This project is an AI-powered desktop automation tool that lets you control your
 - Make sure you are logged into WhatsApp Web before trying to send messages.
 - Adjust sleep delays (`time.sleep`) if your internet or system speed varies.
 
-## 📷 Screenshots
-
-> Include screenshots of your app in action here if needed.
-
 ## 📄 License
 
 This project is open source under the MIT License. See [LICENSE](LICENSE) for details.
