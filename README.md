@@ -22,8 +22,8 @@ This project is an AI-powered desktop automation tool that lets you control your
 
 1. Clone this repository:
     ```bash
-    git clone https://github.com/yourusername/your-repo.git
-    cd your-repo
+    git clone https://github.com/Shabib6/AI-Cursor.git
+    cd AI-Cursor
     ```
 
 2. Install dependencies:
