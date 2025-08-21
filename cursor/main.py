@@ -8,6 +8,7 @@ import pyperclip
 import json
 import pytesseract
 import cv2
+import subprocess
 
 load_dotenv()
 client = os.getenv("OPENAI_API_KEY")
@@ -16,12 +17,15 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 
 def parse_prompt_to_intent(prompt):
     system_prompt = """
-    You are a command interpreter AI. Convert the user's natural language request into a JSON plan for automation.
+    You are a command interpreter AI. 
+    Convert the user's natural language request into a JSON object ONLY. 
+    Do not include any text outside JSON. 
+    Output must be strictly valid JSON.
 
-    Example:
+    Examples:
+
     User: Compose a mail to syedshabib6@gmail.com enquiring about the stock market.
     Output:
-    for gmail:
     {
     "app": "gmail",
     "action": "compose",
@@ -29,14 +33,34 @@ def parse_prompt_to_intent(prompt):
     "subject": "Stock Market Enquiry",
     "body": "Dear Syed, I hope you're doing well. I would like to enquire about the recent stock market changes in the firm."
     }
-    for whatsapp:
+
+    User: Send a WhatsApp message to Thoufiq Ahamed to be ready with the report for the meeting at 10:30 pm tonight.
+    Output:
     {
     "app": "whatsapp",
     "action": "send_message",
     "to": "Thoufiq Ahamed",
     "message": "Hey Thoufiq, please be ready with the report for the meeting at 10:30 pm tonight!"
     }
+
+    User: Show me all the files in the Documents folder.
+    Output:
+    {
+    "app": "os",
+    "action": "run_command",
+    "command": "dir C:\\Users\\<username>\\Documents"
+    }
+
+    User: Check my current IP address.
+    Output:
+    {
+    "app": "os",
+    "action": "run_command",
+    "command": "ipconfig"
+    }
     """
+
+
     response = openai.chat.completions.create(
         model = "gpt-3.5-turbo",
         messages = [ 
@@ -116,6 +140,67 @@ def whatsapp(text):
             pyautogui.press("enter")
             break
 
+
+def run_command(text):
+    command = text["command"]
+
+    # safety check
+    dangerous = ["rm -rf", "del *", "shutdown", "format"]
+    if any(cmd in command.lower() for cmd in dangerous):
+        return "❌ Command looks dangerous, not executing."
+
+    result = subprocess.run(command,shell=True, capture_output=True, text=True)
+    output = result.stdout.strip()
+    error = result.stderr.strip()
+    returncode  = result.returncode
+
+    system_prompt2 = """
+    You are a System Resource Interpreter Assistant.
+    You will receive the following information:
+    - The output of a system command (like free -m, df -h, top, tasklist, ping, etc.)
+    - Any error messages (if present),
+    - The return code.
+
+    Your tasks are:
+    1. First, check if the command executed successfully:
+    - If NOT successful: explain the error in simple terms and suggest possible fixes.
+    - If successful: move to step 2.
+
+    2. Identify what resource or aspect the command relates to (e.g., RAM, CPU, Disk, Network, Processes, etc.).
+
+    3. Summarize the results in clear, human-friendly language. Example style:
+    - "CPU is at 75% usage, which is slightly high."
+    - "Disk usage is 92% full on drive /, system may slow down."
+    - "Network latency is stable at ~20ms, no issues detected."
+
+    4. Provide practical, actionable advice for optimization or troubleshooting:
+    - For CPU: "Close unnecessary heavy apps", "Check for background processes."
+    - For Disk: "Remove unused files", "Consider upgrading storage."
+    - For Network: "Check Wi-Fi strength", "Restart router if latency spikes."
+    - For Errors: "Re-run with sudo", "Verify the path is correct."
+
+    5. Add extra insights when useful:
+    - Compare usage to normal/healthy ranges.
+    - Mention potential risks if values are abnormal.
+    - Suggest follow-up commands for deeper analysis.
+
+    6. Keep explanations supportive, concise, and beginner-friendly.
+
+    7. End with suggested next steps (if any).
+    """
+
+
+    response2 = openai.chat.completions.create(
+        model = "gpt-4o",
+        messages= [
+            {"role": "system", "content": system_prompt2},
+            {"role": "user", "content": f"Output: {output}\nError: {error}\nReturn Code: {returncode}"}
+        ]
+    )
+    return response2.choices[0].message.content.strip()
+
+
+
 if __name__ == "__main__":
     user_prompt = input("What is your request?  ")
     parsed = parse_prompt_to_intent(user_prompt)
@@ -125,5 +210,8 @@ if __name__ == "__main__":
         gmail(parsed)
     elif parsed["app"] == "whatsapp":
         whatsapp(parsed)
+    elif parsed["app"] == "os":
+        os_says = run_command(parsed)
+        print("Command Output:", os_says)
     else:
         print("Unsupported app.")
